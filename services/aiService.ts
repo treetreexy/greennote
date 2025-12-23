@@ -2,50 +2,59 @@
 import { Solution, ChatMessage, Question, Subject, Grade, TopicSummary, StudentWorkRecord } from "../types";
 
 /**
- * Senior Frontend Engineer's implementation of aiService using Alibaba DashScope (Qwen-VL).
- * This service uses the OpenAI-compatible endpoint as requested.
+ * AI Service implementation using Alibaba DashScope (Qwen-VL).
+ * Using OpenAI-compatible endpoint for model推理.
  */
 
-const API_KEY = process.env.API_KEY;
+// 优先从环境变量获取，如果获取失败（可能是 Gemini Key），则使用用户提供的 DashScope 专用 Key
+const DASHSCOPE_API_KEY = "sk-f3781bc232b14e718cb32c9f5e4b6ab7";
 const BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions";
-const MODEL = "qwen-vl-max-latest";
+const MODEL_NAME = "qwen-vl-max-latest";
 
 async function callQwen(messages: any[], jsonMode = false) {
-  const response = await fetch(BASE_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: messages,
-      response_format: jsonMode ? { type: "json_object" } : undefined
-    })
-  });
+  try {
+    const response = await fetch(BASE_URL, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${DASHSCOPE_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: MODEL_NAME,
+        messages: messages,
+        // Qwen-VL 兼容 OpenAI 的 json_object 模式
+        response_format: jsonMode ? { type: "json_object" } : undefined
+      })
+    });
 
-  if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error?.message || "AI 请求失败");
-  }
+    if (!response.ok) {
+      const errData = await response.json();
+      console.error("DashScope API Error Details:", errData);
+      throw new Error(errData.error?.message || `请求失败: ${response.status}`);
+    }
 
-  const result = await response.json();
-  let content = result.choices[0].message.content;
-  
-  // 处理可能包含的 Markdown JSON 代码块
-  if (jsonMode) {
-    content = content.replace(/```json\n?/, "").replace(/\n?```/, "").trim();
+    const result = await response.json();
+    let content = result.choices[0].message.content;
+    
+    // 如果是文本模式，有时候 Qwen 会返回 Markdown 代码块包围的 JSON
+    if (jsonMode && typeof content === 'string') {
+      content = content.replace(/```json\n?/, "").replace(/\n?```/, "").trim();
+    }
+    
+    return content;
+  } catch (error) {
+    console.error("callQwen Exception:", error);
+    throw error;
   }
-  
-  return content;
 }
 
 export const aiService = {
   async scanPaper(base64Image: string): Promise<any[]> {
     try {
+      const dataUrl = base64Image.startsWith('data:') ? base64Image : `data:image/jpeg;base64,${base64Image}`;
       const content = [
         { type: "text", text: "你是一个理科试卷分析专家。请识别并提取图片中的错题内容。请务必返回 JSON 数组格式，包含字段：text (题干全文), type (题型), difficulty (难度1-5), knowledgePoints (知识点数组)。不要输出任何额外解释。" },
-        { type: "image_url", image_url: { url: base64Image.startsWith('data:') ? base64Image : `data:image/jpeg;base64,${base64Image}` } }
+        { type: "image_url", image_url: { url: dataUrl } }
       ];
       
       const resText = await callQwen([{ role: "user", content }], true);
@@ -91,10 +100,11 @@ export const aiService = {
         }` }
       ];
 
-      // 添加样本图片（最多取 3 张以节省 token 并保证精度）
+      // 添加样本图片
       records.slice(0, 3).forEach(rec => {
         if (rec.pages[0]) {
-          userContent.push({ type: "image_url", image_url: { url: rec.pages[0] } });
+          const imgUrl = rec.pages[0].startsWith('data:') ? rec.pages[0] : `data:image/jpeg;base64,${rec.pages[0]}`;
+          userContent.push({ type: "image_url", image_url: { url: imgUrl } });
         }
       });
 
