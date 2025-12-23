@@ -1,0 +1,8 @@
+{
+  "name": "小绿书2",
+  "description": "面向中学生的理科错题整理与智能复习助手。支持试卷拍照、错题识别、多维分类、AI解析及相似题推荐。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
