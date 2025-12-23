@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { WrongItem, LearningPlan, Mastery, ErrorReason } from '../types';
 import { IconChevronRight, IconTrendUp, IconRobot, IconIdea, IconSuccess } from '../components/Icons';
@@ -14,14 +13,14 @@ const LearningReport: React.FC<LearningReportProps> = ({ wrongItems, plans, onBa
   // 1. 数据统计 - 基于近7天
   const stats = useMemo(() => {
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recentWrongs = wrongItems.filter(i => i.collectedAt > sevenDaysAgo);
-    const masteredCount = wrongItems.filter(i => i.mastery === Mastery.MASTERED).length;
-    const completedPlans = plans.filter(p => p.status === 'completed').length;
+    const recentWrongs = (wrongItems || []).filter(i => i.collectedAt > sevenDaysAgo);
+    const masteredCount = (wrongItems || []).filter(i => i.mastery === Mastery.MASTERED).length;
+    const completedPlans = (plans || []).filter(p => p.status === 'completed').length;
     
     // 粗略计算练习正确率（如有plan数据）
     let totalAccuracy = 0;
     let count = 0;
-    plans.forEach(p => p.tasks.forEach(t => {
+    (plans || []).forEach(p => p.tasks?.forEach(t => {
       if (t.isCompleted && t.score !== undefined) {
         totalAccuracy += t.score;
         count++;
@@ -39,15 +38,16 @@ const LearningReport: React.FC<LearningReportProps> = ({ wrongItems, plans, onBa
 
   // 2. 雷达图数据映射 (5个维度)
   const radarData = useMemo(() => {
+    const total = wrongItems?.length || 1;
     // 基础扎实度：已掌握题数占比
-    const d1 = Math.min(100, (stats.mastered / (wrongItems.length || 1)) * 100 + 30);
+    const d1 = Math.min(100, (stats.mastered / total) * 100 + 30);
     // 思维灵活性：题型覆盖度
     const d2 = 75; 
     // 抗压能力：中高难度题正确率（模拟）
     const d3 = 60;
     // 细致程度：反向计算错因中“审题/计算”占比
-    const carelessCount = wrongItems.filter(i => i.reason.includes(ErrorReason.MISREAD) || i.reason.includes(ErrorReason.CALCULATION)).length;
-    const d4 = Math.max(20, 100 - (carelessCount / (wrongItems.length || 1)) * 100);
+    const carelessCount = (wrongItems || []).filter(i => i.reason?.includes(ErrorReason.MISREAD) || i.reason?.includes(ErrorReason.CALCULATION)).length;
+    const d4 = Math.max(20, 100 - (carelessCount / total) * 100);
     // 近期稳定性：近7天新增错题数反比
     const d5 = Math.max(20, 100 - stats.newWrongs * 5);
 
@@ -57,8 +57,8 @@ const LearningReport: React.FC<LearningReportProps> = ({ wrongItems, plans, onBa
   // 3. 薄弱考点 TOP 5
   const topWeakPoints = useMemo(() => {
     const kpMap: Record<string, { count: number, lastTime: number }> = {};
-    wrongItems.forEach(item => {
-      item.knowledgePoints.forEach(kp => {
+    (wrongItems || []).forEach(item => {
+      (item.knowledgePoints || []).forEach(kp => {
         if (!kpMap[kp]) kpMap[kp] = { count: 0, lastTime: 0 };
         kpMap[kp].count++;
         kpMap[kp].lastTime = Math.max(kpMap[kp].lastTime, item.collectedAt);
@@ -72,7 +72,7 @@ const LearningReport: React.FC<LearningReportProps> = ({ wrongItems, plans, onBa
         name,
         count: data.count,
         lastTime: new Date(data.lastTime).toLocaleDateString(),
-        errorRate: Math.round((data.count / (wrongItems.length || 1)) * 100)
+        errorRate: Math.round((data.count / (wrongItems?.length || 1)) * 100)
       }));
   }, [wrongItems]);
 
@@ -83,9 +83,10 @@ const LearningReport: React.FC<LearningReportProps> = ({ wrongItems, plans, onBa
       list.push(`优先复习「${topWeakPoints[0].name}」，该考点近期复错率较高，建议进行相似题专项突破。`);
     }
     
-    const carelessCount = wrongItems.filter(i => i.reason.includes(ErrorReason.MISREAD) || i.reason.includes(ErrorReason.CALCULATION)).length;
-    if (carelessCount / (wrongItems.length || 1) > 0.3) {
-      list.push(`审题与计算类错误占比较高 (${Math.round(carelessCount/(wrongItems.length||1)*100)}%)，建议练习时养成划重点关键词的习惯。`);
+    const carelessCount = (wrongItems || []).filter(i => i.reason?.includes(ErrorReason.MISREAD) || i.reason?.includes(ErrorReason.CALCULATION)).length;
+    const total = wrongItems?.length || 1;
+    if (carelessCount / total > 0.3) {
+      list.push(`审题与计算类错误占比较高 (${Math.round(carelessCount / total * 100)}%)，建议练习时养成划重点关键词的习惯。`);
     } else {
       list.push(`基础概念掌握较稳，下一阶段建议尝试中高难度题型，冲击更高分段。`);
     }

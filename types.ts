@@ -27,7 +27,10 @@ export enum ErrorReason {
   TIME = '时间分配不当',
   LOGIC = '逻辑推导错误',
   KNOWLEDGE_GAP = '知识点盲区',
-  NERVOUS = '考试焦虑/状态不佳'
+  NERVOUS = '状态不佳',
+  UNIT = '单位漏写/写错',
+  SIGN = '符号错误(+/-)',
+  COPY = '抄错数字/条件'
 }
 
 export enum Mastery {
@@ -162,33 +165,6 @@ export interface LearningTopic {
   summary?: TopicSummary;
 }
 
-// --- 教师端新增定义 ---
-
-export interface TeacherClass {
-  id: string;
-  name: string;
-  studentCount: number;
-  subject: Subject;
-  grade: Grade;
-}
-
-export interface TeacherFolder {
-  id: string;
-  name: string;
-  classId: string;
-  subject: Subject;
-  createdAt: number;
-}
-
-export interface ClassStudent {
-  id: string;
-  name: string;
-  avatar?: string;
-  totalWrongCount: number;
-  masteryRate: number;
-  recentTrends: number[]; // 近7天错题数
-}
-
 export interface StudentWorkRecord {
   studentId: string;
   studentName: string;
@@ -197,10 +173,22 @@ export interface StudentWorkRecord {
   score?: number;
 }
 
+export interface ErrorPointStat {
+  id: string;
+  errorPoint: string; // "错误点：符号错误（把 - 写成 +）"
+  count: number;
+  percentage: number;
+  evidence: string; // "证据：第5题学生普遍把减号当加号处理"
+  impact: string; // "影响：导致最终结果偏大"
+  relatedQuestionNumbers: number[];
+  tags: string[]; // ["分式运算", "基础运算"]
+  typicalWrongAnswers: { text: string; count: number }[];
+}
+
 export interface GradingSession {
   id: string;
   workName: string;
-  folderId?: string; // 关联文件夹
+  folderId?: string;
   classId: string;
   subject: Subject;
   createdAt: number;
@@ -211,26 +199,14 @@ export interface GradingSession {
     maxScore: number;
     minScore: number;
     distribution: Record<string, number>;
+    errorPointStats: ErrorPointStat[];
     questionStats: {
       number: number;
       correctRate: number;
       wrongCount: number;
+      errorLabel?: string;
       knowledgePoints: string[];
-      commonWrongAnswers: { text: string; count: number }[];
+      imageSnippet?: string;
     }[];
   };
-}
-
-export interface ClassWrongItem {
-  id: string;
-  questionText: string;
-  image?: string;
-  knowledgePoints: string[];
-  difficulty: number;
-  errorReasonType?: ErrorReason;
-  wrongStudentCount: number;
-  correctRate: number;
-  sourceSessionId: string; // 关联到 File (GradingSession)
-  lastGradedAt: number;
-  explanationNote?: string;
 }

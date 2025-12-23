@@ -71,17 +71,19 @@ const App: React.FC = () => {
 
   const handleFilterComplete = (filteredImage: string, results: any[]) => {
     setScanImage(filteredImage);
-    setScanResults(results);
+    setScanResults(results || []);
     setView('scan');
   };
 
   const handleConfirmSaveWrong = (finalEnrichedItems: any[]) => {
+    if (!finalEnrichedItems) return;
     let newlyAdded = 0;
     let updatedCount = 0;
 
     setWrongItems(prev => {
       let result = [...prev];
       finalEnrichedItems.forEach(newItem => {
+        if (!newItem || !newItem.text) return;
         const existingIdx = result.findIndex(item => item.text.trim() === newItem.text.trim());
         
         if (existingIdx > -1) {
@@ -168,7 +170,7 @@ const App: React.FC = () => {
     const plan = learningPlans.find(p => p.id === planId);
     if (plan) {
       const task = plan.tasks[taskIndex];
-      const questionIds = task.questions.map(q => q.id);
+      const questionIds = (task.questions || []).map(q => q.id);
       
       setWrongItems(prev => prev.map(item => {
         if (questionIds.includes(item.id)) {
